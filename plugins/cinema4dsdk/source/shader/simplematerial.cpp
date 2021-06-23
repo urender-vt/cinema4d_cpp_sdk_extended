@@ -212,9 +212,34 @@ Bool SimpleMaterial::Message(GeListNode* node, Int32 type, void* data)
 			break;
 		}
 		case MATPREVIEW_PREPARE_SCENE:
-			// let the preview handle the rest...
+		{
+			// this is called each time the preview wants to render our scene
+			MatPreviewPrepareScene* preparescene = (MatPreviewPrepareScene*)data;
+
+			AutoAlloc<AliasTrans> trans;
+			if (!trans)
+				return false;
+			if (!trans->Init(GetActiveDocument()))
+				return false;
+			BaseMaterial* matclone = (BaseMaterial*)(Get()->GetClone(COPYFLAGS::NONE, trans));
+			preparescene->pDoc->InsertMaterial(matclone);
+			trans->Translate(true);
+			if (preparescene->pLink)
+				preparescene->pLink->SetLink(matclone);		// necessary
+
+			// find the environment object and set the material
+			BaseObject* env = preparescene->pDoc->SearchObject(String("Object"));
+			if (env)
+			{
+				TextureTag* textag = (TextureTag*)env->GetTag(Ttexture);
+				if (textag)
+					textag->SetMaterial(matclone);
+			}
+
+			preparescene->bScenePrepared = true; // inform the preview that the scene is prepared now
 			return true;
 			break;
+		}
 		case MATPREVIEW_GENERATE_IMAGE:
 		{
 			MatPreviewGenerateImage* image = (MatPreviewGenerateImage*)data;
