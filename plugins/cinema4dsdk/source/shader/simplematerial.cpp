@@ -26,6 +26,8 @@ public:
 	virtual Bool Message(GeListNode* node, Int32 type, void* data);
 	virtual Bool CopyTo(NodeData* dest, GeListNode* snode, GeListNode* dnode, COPYFLAGS flags, AliasTrans* trn);
 
+	virtual Bool InitGLImage(BaseMaterial* mat, BaseDocument* doc, BaseThread* th, BaseBitmap* bmp, Int32 doccolorspace, Bool linearworkflow);
+
 	static NodeData* Alloc() { return NewObjClear(SimpleMaterial); }
 
 	Int32 updatecount;
@@ -251,6 +253,34 @@ Bool SimpleMaterial::CopyTo(NodeData* dest, GeListNode* snode, GeListNode* dnode
 }
 
 
+Bool SimpleMaterial::InitGLImage(BaseMaterial* mat, BaseDocument* doc, BaseThread* th, BaseBitmap* bmp, Int32 doccolorspace, Bool linearworkflow)
+{
+	static UInt32 counter = 0;
+    GePrint(String("InitGLImage ") + String::UIntToString(++counter));
+
+    if (!bmp)
+        return false;
+
+    BaseContainer* data = mat->GetDataInstance();
+    if (!data)
+        return false;
+
+    const auto color = data->GetVector(SIMPLEMATERIAL_COLOR).GetColor();
+
+    bmp->Clear(int(color.r * 255.0), int(color.g * 255.0), int(color.b * 255.0));
+
+	// NOTE: the calls to bmp->SetDirty() and EventAdd() here are used based on the information in the following forum post:
+	// http://www.plugincafe.com/forum/forum_posts.asp?TID=10550&PID=42319#42319
+
+    bmp->SetDirty(); // this is required so that the editor is updated when OpenGL is used
+
+	// NOTE: calling EventAdd() here propagates the InitGLImage() spam calls to also spam SceneHook::Execute() calls for all scenehooks that are currently active!!!
+	// Uncomment the next line, and you will see the SceneHook::Execute() spam happening in the c4d console.
+    //EventAdd(); // updates the editor view when using software rendering.
+
+    return true;
+}
+
 Bool RegisterSimpleMaterial()
 {
 	String name = GeGetDefaultFilename(DEFAULTFILENAME_SHADER_VOLUME) + GeLoadString(IDS_SIMPLEMATERIAL);	// place in default Shader section
@@ -258,5 +288,5 @@ Bool RegisterSimpleMaterial()
 	// add a preview scene that can only be selected in the Simple Material's preview
 	AddUserPreviewScene(GeGetPluginResourcePath() + String("scene") + String("Stairs.c4d"), ID_SIMPLEMAT, nullptr);
 
-	return RegisterMaterialPlugin(ID_SIMPLEMAT, name, 0, SimpleMaterial::Alloc, "Msimplematerial"_s, 0);
+	return RegisterMaterialPlugin(ID_SIMPLEMAT, name, PLUGINFLAG_MATERIAL_GLIMAGE, SimpleMaterial::Alloc, "Msimplematerial"_s, 0);
 }
